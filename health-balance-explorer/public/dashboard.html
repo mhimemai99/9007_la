@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Health Balance Dashboard — CLC9007 Instructor</title>
+<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0e14;--bg2:#131a24;--card:rgba(255,255,255,0.04);
+  --card-border:rgba(255,255,255,0.06);
+  --text:#f0e6d8;--text2:rgba(240,230,216,0.55);--text3:rgba(240,230,216,0.3);
+  --physical:#34d399;--psychological:#fbbf24;--social:#f472b6;--spiritual:#a78bfa;
+  --accent:#f5deb3;
+}
+body{min-height:100vh;background:var(--bg);color:var(--text);
+  font-family:'Quicksand','Noto Sans TC',sans-serif;padding:24px}
+
+.dashboard{max-width:1100px;margin:0 auto}
+.header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:24px}
+.header h1{font-size:1.5rem;font-weight:700}
+.header-actions{display:flex;gap:8px;align-items:center}
+.count-badge{background:var(--card);border:1px solid var(--card-border);
+  padding:6px 16px;border-radius:50px;font-size:.9rem;font-weight:600}
+.btn{padding:10px 20px;border:none;border-radius:50px;font-family:inherit;font-size:.85rem;
+  font-weight:600;cursor:pointer;transition:all .2s}
+.btn-refresh{background:rgba(52,211,153,.15);color:var(--physical)}
+.btn-reset{background:rgba(244,114,182,.1);color:var(--social)}
+.btn:hover{filter:brightness(1.2)}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:16px}
+.panel{background:var(--card);border:1px solid var(--card-border);border-radius:16px;padding:20px}
+.panel h2{font-size:1rem;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.panel h2 span{font-size:1.2rem}
+
+.radar-wrap{display:flex;justify-content:center;padding:10px 0}
+.radar-wrap canvas{max-width:100%;height:auto}
+
+/* Dimension bars */
+.dim-bar-group{display:flex;flex-direction:column;gap:10px}
+.dim-bar-row{display:flex;align-items:center;gap:10px}
+.dim-bar-label{width:90px;font-size:.75rem;font-weight:600;text-align:right;flex-shrink:0}
+.dim-bar-track{flex:1;height:28px;background:rgba(255,255,255,.04);border-radius:8px;position:relative;overflow:hidden}
+.dim-bar-fill{height:100%;border-radius:8px;transition:width .8s ease;display:flex;align-items:center;
+  padding:0 10px;font-size:.75rem;font-weight:700;color:#fff;min-width:fit-content}
+.dim-bar-val{width:40px;font-size:.85rem;font-weight:700;text-align:center;flex-shrink:0}
+
+/* Type chart */
+.type-list{display:flex;flex-direction:column;gap:6px}
+.type-row{display:flex;align-items:center;gap:8px}
+.type-emoji{font-size:1.2rem;width:28px;text-align:center}
+.type-name{flex:1;font-size:.8rem;font-weight:500}
+.type-bar{width:120px;height:20px;background:rgba(255,255,255,.04);border-radius:6px;overflow:hidden}
+.type-bar-fill{height:100%;background:var(--accent);border-radius:6px;transition:width .6s ease;opacity:.6}
+.type-count{width:32px;text-align:right;font-size:.8rem;font-weight:700}
+
+/* Badge cloud */
+.badge-cloud{display:flex;flex-wrap:wrap;gap:6px}
+.badge-tag{padding:5px 12px;border-radius:50px;font-size:.75rem;font-weight:600;
+  background:rgba(255,255,255,.06);transition:all .3s}
+
+/* Heatmap */
+.heatmap-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.heatmap-col{display:flex;flex-direction:column;gap:2px}
+.heatmap-col-label{font-size:.65rem;font-weight:600;text-align:center;padding:4px;margin-bottom:2px}
+.heatmap-cell{height:20px;border-radius:3px;transition:background .3s}
+.heatmap-legend{display:flex;align-items:center;gap:4px;margin-top:8px;justify-content:center}
+.heatmap-legend span{font-size:.65rem;color:var(--text3)}
+.heatmap-legend-bar{width:100px;height:10px;border-radius:3px;
+  background:linear-gradient(90deg,rgba(255,255,255,.02),var(--accent))}
+
+/* Individual dots */
+.dots-canvas{width:100%;aspect-ratio:1;max-width:400px;margin:0 auto}
+
+.empty-state{text-align:center;padding:40px 20px;color:var(--text3)}
+.empty-state .big{font-size:3rem;display:block;margin-bottom:8px}
+
+.status-bar{font-size:.75rem;color:var(--text3);text-align:center;padding:8px}
+
+/* Reset modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;
+  justify-content:center;z-index:100;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal-overlay.show{opacity:1;pointer-events:auto}
+.modal{background:var(--bg2);border:1px solid var(--card-border);border-radius:16px;
+  padding:24px;max-width:380px;width:90%;text-align:center}
+.modal h3{margin-bottom:8px}
+.modal p{font-size:.85rem;color:var(--text2);margin-bottom:16px}
+.modal input{width:100%;padding:10px;border:1px solid var(--card-border);border-radius:8px;
+  background:var(--card);color:var(--text);font-family:inherit;font-size:.9rem;margin-bottom:12px}
+.modal-btns{display:flex;gap:8px;justify-content:center}
+</style>
+</head>
+<body>
+
+<div class="dashboard">
+  <div class="header">
+    <h1>📊 Health Balance Dashboard</h1>
+    <div class="header-actions">
+      <div class="count-badge" id="countBadge">0 responses</div>
+      <button class="btn btn-refresh" onclick="loadData()">↻ Refresh</button>
+      <button class="btn btn-reset" onclick="showResetModal()">Reset Session</button>
+    </div>
+  </div>
+
+  <div id="emptyState" class="empty-state">
+    <span class="big">📭</span>
+    <h2>Waiting for responses...</h2>
+    <p>Students scan the QR code and submit their anonymous data.<br>Click Refresh to check for new submissions.</p>
+  </div>
+
+  <div id="dataView" style="display:none">
+    <div class="grid">
+      <!-- Class Radar -->
+      <div class="panel">
+        <h2><span>🎯</span> Class Average Radar</h2>
+        <div class="radar-wrap"><canvas id="classRadar" width="400" height="400"></canvas></div>
+      </div>
+      <!-- Dimension Bars -->
+      <div class="panel">
+        <h2><span>📊</span> Dimension Averages</h2>
+        <div class="dim-bar-group" id="dimBars"></div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- Heatmap -->
+      <div class="panel">
+        <h2><span>🌡️</span> Score Distribution Heatmap</h2>
+        <p style="font-size:.75rem;color:var(--text3);margin-bottom:10px">Each row = score 1–10 (bottom to top). Brighter = more students.</p>
+        <div class="heatmap-grid" id="heatmap"></div>
+        <div class="heatmap-legend">
+          <span>0</span>
+          <div class="heatmap-legend-bar"></div>
+          <span>max</span>
+        </div>
+      </div>
+      <!-- Health Types -->
+      <div class="panel">
+        <h2><span>🧬</span> Health Type Distribution</h2>
+        <div class="type-list" id="typeList"></div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- Badge Frequency -->
+      <div class="panel">
+        <h2><span>🏆</span> Most Common Top Badges</h2>
+        <div class="badge-cloud" id="badgeCloud"></div>
+      </div>
+      <!-- Scatter plot -->
+      <div class="panel">
+        <h2><span>🔵</span> Individual Profiles (Anonymous)</h2>
+        <p style="font-size:.75rem;color:var(--text3);margin-bottom:8px">Each dot = one student's radar overlay</p>
+        <div class="radar-wrap"><canvas id="scatterRadar" width="400" height="400"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="status-bar" id="statusBar">Last updated: never</div>
+</div>
+
+<!-- Reset Modal -->
+<div class="modal-overlay" id="resetModal">
+  <div class="modal">
+    <h3>⚠️ Reset Session Data</h3>
+    <p>This will delete all student submissions. Use this between tutorial sections.</p>
+    <input type="password" id="resetKey" placeholder="Enter reset key" autocomplete="off">
+    <div class="modal-btns">
+      <button class="btn" style="background:var(--card);color:var(--text2)" onclick="hideResetModal()">Cancel</button>
+      <button class="btn btn-reset" onclick="doReset()">Reset</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const DIMS = {
+  physical:      {name:'Physical',  zh:'身體', color:'#34d399'},
+  psychological: {name:'Mental',    zh:'心理', color:'#fbbf24'},
+  social:        {name:'Social',    zh:'社交', color:'#f472b6'},
+  spiritual:     {name:'Spiritual', zh:'靈性', color:'#a78bfa'}
+};
+const TYPE_META = {
+  harmonizer:  {name:'Harmonizer',       zh:'平衡大師',   emoji:'⚖️'},
+  awakening:   {name:'Awakening Explorer',zh:'覺醒探索者', emoji:'🌱'},
+  bodybuilder: {name:'Body Builder',     zh:'身體力行者', emoji:'💪'},
+  innersage:   {name:'Inner Sage',       zh:'心靈智者',   emoji:'🧠'},
+  peopleperson:{name:'People Person',    zh:'人際達人',   emoji:'👥'},
+  soulsearcher:{name:'Soul Searcher',    zh:'靈性探索者', emoji:'🔮'},
+  halfmoon:    {name:'Half-Moon',        zh:'半月型',     emoji:'🌓'},
+  almostthere: {name:'Almost-There',     zh:'差一步大師', emoji:'🎯'}
+};
+
+let data = null;
+
+async function loadData() {
+  try {
+    const res = await fetch('/api/data');
+    data = await res.json();
+    render();
+    document.getElementById('statusBar').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+  } catch (e) {
+    document.getElementById('statusBar').textContent = 'Error loading data: ' + e.message;
+  }
+}
+
+function render() {
+  const n = data.count;
+  document.getElementById('countBadge').textContent = n + ' response' + (n !== 1 ? 's' : '');
+  
+  if (n === 0) {
+    document.getElementById('emptyState').style.display = '';
+    document.getElementById('dataView').style.display = 'none';
+    return;
+  }
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('dataView').style.display = '';
+
+  drawClassRadar();
+  renderDimBars();
+  renderHeatmap();
+  renderTypes();
+  renderBadges();
+  drawScatterRadar();
+}
+
+function drawClassRadar() {
+  const canvas = document.getElementById('classRadar');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const cx = W/2, cy = H/2, R = Math.min(W,H)/2 - 50;
+  ctx.clearRect(0, 0, W, H);
+
+  const dimKeys = ['physical','psychological','social','spiritual'];
+  const labels = ['Physical 身體','Mental 心理','Social 社交','Spiritual 靈性'];
+  const colors = dimKeys.map(k => DIMS[k].color);
+  const angles = dimKeys.map((_, i) => (Math.PI * 2 * i / 4) - Math.PI / 2);
+  const avg = data.averages;
+
+  // Grid
+  for (let ring = 2; ring <= 10; ring += 2) {
+    const r = (ring / 10) * R;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1; ctx.stroke();
+    if (ring % 4 === 0) {
+      ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.font = '12px Quicksand';
+      ctx.fillText(ring.toString(), cx + 4, cy - r + 14);
+    }
+  }
+  for (let i = 0; i < 4; i++) {
+    ctx.beginPath(); ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(angles[i]) * R, cy + Math.sin(angles[i]) * R);
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1; ctx.stroke();
+  }
+
+  // Fill
+  ctx.beginPath();
+  dimKeys.forEach((k, i) => {
+    const r = (avg[k] / 10) * R;
+    const x = cx + Math.cos(angles[i]) * r;
+    const y = cy + Math.sin(angles[i]) * r;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(cx - R, cy - R, cx + R, cy + R);
+  grad.addColorStop(0, 'rgba(52,211,153,0.25)');
+  grad.addColorStop(0.33, 'rgba(251,191,36,0.25)');
+  grad.addColorStop(0.66, 'rgba(244,114,182,0.25)');
+  grad.addColorStop(1, 'rgba(167,139,250,0.25)');
+  ctx.fillStyle = grad; ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 2.5; ctx.stroke();
+
+  // Points + labels
+  dimKeys.forEach((k, i) => {
+    const r = (avg[k] / 10) * R;
+    const x = cx + Math.cos(angles[i]) * r;
+    const y = cy + Math.sin(angles[i]) * r;
+    ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2);
+    ctx.fillStyle = colors[i]; ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+
+    const lx = cx + Math.cos(angles[i]) * (R + 28);
+    const ly = cy + Math.sin(angles[i]) * (R + 28);
+    ctx.font = '600 16px Quicksand'; ctx.textAlign = 'center'; ctx.fillStyle = colors[i];
+    ctx.fillText(labels[i], lx, ly);
+    ctx.font = '700 18px Quicksand'; ctx.fillStyle = '#fff';
+    ctx.fillText(avg[k].toFixed(1), lx, ly + 20);
+  });
+}
+
+function renderDimBars() {
+  const dimKeys = ['physical','psychological','social','spiritual'];
+  let html = '';
+  dimKeys.forEach(k => {
+    const d = DIMS[k]; const val = data.averages[k];
+    const pct = (val / 10) * 100;
+    html += `<div class="dim-bar-row">
+      <div class="dim-bar-label" style="color:${d.color}">${d.name}<br>${d.zh}</div>
+      <div class="dim-bar-track"><div class="dim-bar-fill" style="width:${pct}%;background:${d.color}">${val.toFixed(1)}</div></div>
+      <div class="dim-bar-val" style="color:${d.color}">${val.toFixed(1)}</div>
+    </div>`;
+  });
+  document.getElementById('dimBars').innerHTML = html;
+}
+
+function renderHeatmap() {
+  const dimKeys = ['physical','psychological','social','spiritual'];
+  let html = '';
+  dimKeys.forEach(k => {
+    const d = DIMS[k]; const dist = data.distributions[k]; // array of 10
+    const maxVal = Math.max(...dist, 1);
+    html += `<div class="heatmap-col">
+      <div class="heatmap-col-label" style="color:${d.color}">${d.name}<br>${d.zh}</div>`;
+    // Rows from 10 (top) to 1 (bottom)
+    for (let i = 9; i >= 0; i--) {
+      const intensity = dist[i] / maxVal;
+      const bg = intensity === 0 ? 'rgba(255,255,255,0.02)' :
+        `${d.color}${Math.round(intensity * 200 + 30).toString(16).padStart(2,'0')}`;
+      html += `<div class="heatmap-cell" style="background:${bg}" title="Score ${i+1}: ${dist[i]} students"></div>`;
+    }
+    html += `</div>`;
+  });
+  document.getElementById('heatmap').innerHTML = html;
+}
+
+function renderTypes() {
+  const maxCount = Math.max(...Object.values(data.types), 1);
+  let entries = Object.entries(TYPE_META).map(([key, meta]) => ({
+    key, ...meta, count: data.types[key] || 0
+  }));
+  entries.sort((a, b) => b.count - a.count);
+
+  let html = '';
+  entries.forEach(t => {
+    const pct = (t.count / maxCount) * 100;
+    html += `<div class="type-row">
+      <div class="type-emoji">${t.emoji}</div>
+      <div class="type-name">${t.name} ${t.zh}</div>
+      <div class="type-bar"><div class="type-bar-fill" style="width:${pct}%"></div></div>
+      <div class="type-count">${t.count}</div>
+    </div>`;
+  });
+  document.getElementById('typeList').innerHTML = html;
+}
+
+function renderBadges() {
+  if (!data.badges || Object.keys(data.badges).length === 0) {
+    document.getElementById('badgeCloud').innerHTML = '<span style="color:var(--text3);font-size:.85rem">No badge data yet</span>';
+    return;
+  }
+  let entries = Object.entries(data.badges).sort((a, b) => b[1] - a[1]);
+  const maxCount = entries[0]?.[1] || 1;
+  let html = '';
+  entries.forEach(([name, count]) => {
+    const opacity = 0.3 + (count / maxCount) * 0.7;
+    const size = 0.7 + (count / maxCount) * 0.3;
+    html += `<div class="badge-tag" style="opacity:${opacity};font-size:${size}rem">${name} (${count})</div>`;
+  });
+  document.getElementById('badgeCloud').innerHTML = html;
+}
+
+function drawScatterRadar() {
+  const canvas = document.getElementById('scatterRadar');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const cx = W/2, cy = H/2, R = Math.min(W,H)/2 - 40;
+  ctx.clearRect(0, 0, W, H);
+
+  const dimKeys = ['physical','psychological','social','spiritual'];
+  const colors = dimKeys.map(k => DIMS[k].color);
+  const angles = dimKeys.map((_, i) => (Math.PI * 2 * i / 4) - Math.PI / 2);
+
+  // Grid
+  for (let ring = 2; ring <= 10; ring += 2) {
+    const r = (ring / 10) * R;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)'; ctx.lineWidth = 1; ctx.stroke();
+  }
+  for (let i = 0; i < 4; i++) {
+    ctx.beginPath(); ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(angles[i]) * R, cy + Math.sin(angles[i]) * R);
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.stroke();
+  }
+
+  // Individual shapes
+  if (data.submissions) {
+    data.submissions.forEach(s => {
+      ctx.beginPath();
+      dimKeys.forEach((k, i) => {
+        const r = (s[k] / 10) * R;
+        const x = cx + Math.cos(angles[i]) * r;
+        const y = cy + Math.sin(angles[i]) * r;
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      });
+      ctx.closePath();
+      ctx.strokeStyle = 'rgba(245,222,179,0.12)'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.fillStyle = 'rgba(245,222,179,0.03)'; ctx.fill();
+    });
+  }
+
+  // Axis labels
+  const shortLabels = ['Phy','Psy','Soc','Spi'];
+  ctx.font = '600 13px Quicksand'; ctx.textAlign = 'center';
+  dimKeys.forEach((k, i) => {
+    const lx = cx + Math.cos(angles[i]) * (R + 18);
+    const ly = cy + Math.sin(angles[i]) * (R + 18);
+    ctx.fillStyle = colors[i];
+    ctx.fillText(shortLabels[i], lx, ly + 4);
+  });
+}
+
+// Modal
+function showResetModal() { document.getElementById('resetModal').classList.add('show'); }
+function hideResetModal() { document.getElementById('resetModal').classList.remove('show'); document.getElementById('resetKey').value = ''; }
+
+async function doReset() {
+  const key = document.getElementById('resetKey').value;
+  if (!key) return;
+  try {
+    const res = await fetch('/api/reset', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ key })
+    });
+    const result = await res.json();
+    if (res.ok) {
+      hideResetModal();
+      alert(`Session reset. ${result.deleted} submissions deleted.`);
+      loadData();
+    } else {
+      alert('Reset failed: ' + (result.error || 'Unknown error'));
+    }
+  } catch (e) {
+    alert('Reset error: ' + e.message);
+  }
+}
+
+// Auto-refresh every 15 seconds
+loadData();
+setInterval(loadData, 15000);
+</script>
+</body>
+</html>
