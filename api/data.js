@@ -1,10 +1,10 @@
-import { list } from '@vercel/blob';
+const { list } = require('@vercel/blob');
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  
+
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -14,37 +14,24 @@ export default async function handler(req, res) {
     let hasMore = true;
 
     while (hasMore) {
-      const result = await list({
-        prefix: 'submissions/',
-        cursor,
-        limit: 100
-      });
-
+      const result = await list({ prefix: 'submissions/', cursor, limit: 100 });
       for (const blob of result.blobs) {
         try {
           const response = await fetch(blob.url);
           const data = await response.json();
           submissions.push(data);
-        } catch (e) {
-          console.error('Failed to read blob:', blob.pathname, e);
-        }
+        } catch (e) {}
       }
-
       cursor = result.cursor;
       hasMore = result.hasMore;
     }
 
-    // Compute aggregates
     const n = submissions.length;
-    
     if (n === 0) {
       return res.status(200).json({
-        count: 0,
-        averages: { physical: 0, psychological: 0, social: 0, spiritual: 0 },
+        count: 0, averages: { physical: 0, psychological: 0, social: 0, spiritual: 0 },
         distributions: { physical: [], psychological: [], social: [], spiritual: [] },
-        types: {},
-        badges: {},
-        submissions: []
+        types: {}, badges: {}, submissions: []
       });
     }
 
@@ -59,9 +46,7 @@ export default async function handler(req, res) {
         const bucket = Math.max(0, Math.min(9, Math.round(s[dim]) - 1));
         distributions[dim][bucket]++;
       }
-      
       types[s.type] = (types[s.type] || 0) + 1;
-      
       if (Array.isArray(s.badges)) {
         for (const badge of s.badges) {
           badgeCounts[badge] = (badgeCounts[badge] || 0) + 1;
@@ -77,21 +62,14 @@ export default async function handler(req, res) {
     };
 
     return res.status(200).json({
-      count: n,
-      averages,
-      distributions,
-      types,
-      badges: badgeCounts,
+      count: n, averages, distributions, types, badges: badgeCounts,
       submissions: submissions.map(s => ({
-        physical: s.physical,
-        psychological: s.psychological,
-        social: s.social,
-        spiritual: s.spiritual,
-        type: s.type
+        physical: s.physical, psychological: s.psychological,
+        social: s.social, spiritual: s.spiritual, type: s.type
       }))
     });
   } catch (error) {
     console.error('Data error:', error);
-    return res.status(500).json({ error: 'Failed to retrieve data' });
+    return res.status(500).json({ error: error.message });
   }
-}
+};
