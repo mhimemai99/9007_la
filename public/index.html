@@ -101,7 +101,8 @@ p{line-height:1.6;color:var(--text2)}
   border-radius:50px;font-size:.8rem;font-weight:600;animation:popIn .4s ease backwards}
 .badge-chip .b-emoji{font-size:1.1rem}
 .badge-chip.top{border:2px solid;background:rgba(255,255,255,.06)}
-.badge-chip.other{background:var(--card);color:var(--text3);font-size:.75rem}
+.badge-chip.also{font-size:.78rem}
+.badge-chip.other{background:var(--card);color:var(--text3);font-size:.75rem;opacity:.6}
 
 .dim-scores{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
 .dim-score{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;background:var(--card)}
@@ -342,7 +343,8 @@ let answers = new Array(14).fill(0); // 0 = unanswered
 let currentQ = 0;
 let myType = null;
 let myTopBadges = [];
-let myOtherBadges = [];
+let myAlsoBadges = [];
+let myMissingBadges = [];
 let myDimAvg = {};
 let bingoComplete = [false,false,false];
 let submitted = false;
@@ -427,11 +429,13 @@ function calculateResults() {
     myDimAvg[key] = scores.reduce((a,b) => a+b, 0) / scores.length;
   }
 
-  // Badge assignment: top 3 by score
+  // Badge assignment: top 3 + tied + missing
   const indexed = answers.map((score, i) => ({score, i}));
   indexed.sort((a, b) => b.score - a.score);
   myTopBadges = indexed.slice(0, 3).map(x => x.i);
-  myOtherBadges = indexed.slice(3).filter(x => x.score > 0).map(x => x.i);
+  const thirdScore = indexed[2].score;
+  myAlsoBadges = indexed.slice(3).filter(x => x.score >= thirdScore).map(x => x.i);
+  myMissingBadges = indexed.filter(x => x.score < thirdScore).map(x => x.i);
 
   // Health type classification
   myType = classifyType(myDimAvg);
@@ -506,8 +510,8 @@ function renderResults() {
   }
   document.getElementById('dimScores').innerHTML = dimHtml;
 
-  // Badges
-  let badgeHtml = '<h2>🏆 Your Top 3 Strengths</h2><div class="badges-grid">';
+  // Badges — three sections
+  let badgeHtml = '<h2>🏆 Your Top 3 Strengths 你的三大強項</h2><div class="badges-grid">';
   myTopBadges.forEach((idx, i) => {
     const q = QUESTIONS[idx];
     const dim = DIMS[q.dim];
@@ -517,11 +521,23 @@ function renderResults() {
   });
   badgeHtml += '</div>';
 
-  if (myOtherBadges.length > 0) {
-    badgeHtml += '<h2 style="margin-top:14px;font-size:.75rem">You also earned 你也獲得了</h2><div class="badges-grid">';
-    myOtherBadges.forEach((idx, i) => {
+  if (myAlsoBadges.length > 0) {
+    badgeHtml += '<h2 style="margin-top:14px;font-size:.75rem">✅ You also earned 你也擁有</h2><div class="badges-grid">';
+    myAlsoBadges.forEach((idx, i) => {
       const q = QUESTIONS[idx];
-      badgeHtml += `<div class="badge-chip other" style="animation-delay:${(.45+i*.08)}s">
+      const dim = DIMS[q.dim];
+      badgeHtml += `<div class="badge-chip also" style="border:1px solid ${dim.color}44;background:${dim.color}11;animation-delay:${(.45+i*.08)}s">
+        <span class="b-emoji">${q.emoji}</span>${q.badge} ${q.badgeZh}
+      </div>`;
+    });
+    badgeHtml += '</div>';
+  }
+
+  if (myMissingBadges.length > 0) {
+    badgeHtml += '<h2 style="margin-top:14px;font-size:.75rem">🔍 Find in others 在同學身上尋找</h2><div class="badges-grid">';
+    myMissingBadges.forEach((idx, i) => {
+      const q = QUESTIONS[idx];
+      badgeHtml += `<div class="badge-chip other" style="animation-delay:${(.6+i*.06)}s">
         <span class="b-emoji">${q.emoji}</span>${q.badge}
       </div>`;
     });
@@ -619,7 +635,8 @@ function drawRadar() {
 // ═══════════════════════════════════════════════════════════════
 function renderBingo() {
   const t = TYPES[myType];
-  const topBadgeNames = myTopBadges.map(i => QUESTIONS[i].emoji + ' ' + QUESTIONS[i].badge).join(', ');
+  const allEarned = [...myTopBadges, ...myAlsoBadges];
+  const topBadgeNames = allEarned.map(i => QUESTIONS[i].emoji + ' ' + QUESTIONS[i].badge).join(', ');
   document.getElementById('myProfileCard').innerHTML = `
     <div class="profile-emoji">${t.emoji}</div>
     <div class="profile-info">
@@ -673,7 +690,7 @@ async function submitData() {
   document.getElementById('submitDone').classList.add('hidden');
   document.getElementById('submitError').classList.add('hidden');
 
-  const topBadgeNames = myTopBadges.map(i => QUESTIONS[i].badge);
+  const allEarnedNames = [...myTopBadges, ...myAlsoBadges].map(i => QUESTIONS[i].badge);
 
   const payload = {
     physical: +myDimAvg.physical.toFixed(2),
@@ -681,7 +698,7 @@ async function submitData() {
     social: +myDimAvg.social.toFixed(2),
     spiritual: +myDimAvg.spiritual.toFixed(2),
     type: myType,
-    badges: topBadgeNames
+    badges: allEarnedNames
   };
 
   try {
